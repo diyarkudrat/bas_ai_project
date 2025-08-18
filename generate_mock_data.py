@@ -29,14 +29,15 @@ def generate_mock_data(n: int, dt_s: int, anomaly_rate: float, seed: int) -> pd.
     seed : int
         RNG seed for reproducibility
     """
-    rng = np.random.default_rng(seed)
-    t = np.arange(n) * dt_s  # seconds since start
+    rng = np.random.default_rng(seed) # random number generator
+    t = np.arange(n) * dt_s  # seconds since start of simulation
 
     # -------------------- Drivers: IT load & ambient -------------------- #
     # Daily sine baseline (6↔18 kW) + occasional spikes of 5–12 kW
-    base_kw = 12 + 6 * np.sin(2 * np.pi * (t / (24 * 3600)))
-    bursts = (rng.random(n) < 0.010) * rng.uniform(5, 12, size=n)
-    it_kw = np.clip(base_kw + bursts, 1, 35)
+
+    base_kw = 12 + 6 * np.sin(2 * np.pi * (t / (24 * 3600))) # baseline IT load
+    bursts = (rng.random(n) < 0.010) * rng.uniform(5, 12, size=n) # occasional spikes
+    it_kw = np.clip(base_kw + bursts, 1, 35) # IT load
 
     # Outside air: mean 22°C, ±5°C daily swing + small noise
     ambient = 22 + 5 * np.sin(2 * np.pi * (t / (24 * 3600) + 0.2)) + rng.normal(0, 0.3, n)
@@ -46,26 +47,26 @@ def generate_mock_data(n: int, dt_s: int, anomaly_rate: float, seed: int) -> pd.
     supply = 19.5 + 0.1 * (ambient - 22) + rng.normal(0, 0.08, n)
 
     # ΔT grows a bit with IT load. Keep it in a sane band (3–12°C)
-    deltaT = np.clip(7 + 0.12 * (it_kw - 12) + rng.normal(0, 0.2, n), 3, 12)
-    ret = supply + deltaT
+    deltaT = np.clip(7 + 0.12 * (it_kw - 12) + rng.normal(0, 0.2, n), 3, 12) # water temp rise across IT equipment
+    ret = supply + deltaT # water temp coming back from IT equipment
 
     # Valve roughly follows load; flow follows valve (very simplified)
-    valve = np.clip(20 + 1.6 * (it_kw - 12) + rng.normal(0, 4, n), 0, 100)
-    flow = np.clip(120 + 3.0 * (valve - 20) + rng.normal(0, 6, n), 30, 300)
+    valve = np.clip(20 + 1.6 * (it_kw - 12) + rng.normal(0, 4, n), 0, 100) # valve opening percentage in the cooling loop
+    flow = np.clip(120 + 3.0 * (valve - 20) + rng.normal(0, 6, n), 30, 300) # flow rate through the cooling loop
 
     # Pressure correlates with flow
-    pressure = np.clip(180 + 0.4 * (flow - 120) + rng.normal(0, 5, n), 120, 280)
+    pressure = np.clip(180 + 0.4 * (flow - 120) + rng.normal(0, 5, n), 120, 280) # chilled water loop pressure
 
     # -------------------- CRAH / airflow side --------------------------- #
     # Inlet temperature near target 23°C, nudged by load
-    inlet = np.clip(23 + 0.03 * (it_kw - 12) + rng.normal(0, 0.2, n), 18, 29)
+    inlet = np.clip(23 + 0.03 * (it_kw - 12) + rng.normal(0, 0.2, n), 18, 29) # IT inlet air temperature
 
     # Fan speeds up when inlet rises; airflow follows fan
-    fan = np.clip(35 + 4.0 * (inlet - 23) + rng.normal(0, 3, n), 20, 100)
-    airflow = np.clip(15000 + 180 * (fan - 35) - rng.normal(0, 500, n), 5000, 40000)
+    fan = np.clip(35 + 4.0 * (inlet - 23) + rng.normal(0, 3, n), 20, 100) # fan speed percentage
+    airflow = np.clip(15000 + 180 * (fan - 35) - rng.normal(0, 500, n), 5000, 40000) # air volume in CFM (cubic feet per minute)
 
     # Humidity floats around 45%
-    rh = np.clip(45 + rng.normal(0, 3, n), 25, 65)
+    rh = np.clip(45 + rng.normal(0, 3, n), 25, 65) # relative humidity in data center
 
     # -------------------- Simple anomalies ------------------------------ #
     # Keep these basic: drift on supply, stuck valve, and inlet dropout.
@@ -116,7 +117,7 @@ def generate_mock_data(n: int, dt_s: int, anomaly_rate: float, seed: int) -> pd.
         "rh_pct": rh,
     })
 
-    # Toy "efficiency" proxy (NOT a true PUE). Just for optimization demos.
+    # cooling system power use
     cooling_kw = 0.015 * df["airflow_CFM"] + 0.008 * df["flow_LPM"] + 0.12 * np.maximum(0.0, np.nan_to_num(df["inlet_C"]) - 22)
     df["pue_proxy"] = (df["it_kw"] + cooling_kw) / df["it_kw"]
 
