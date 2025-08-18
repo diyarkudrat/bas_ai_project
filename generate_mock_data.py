@@ -8,6 +8,18 @@ Usage examples:
   python generate_mock_data.py --minutes 120 --dt 5 --anomaly-rate 0.02 --seed 42
   python generate_mock_data.py --minutes 60 --dt 2 --anomaly-rate 0.04 --out sensor_stream_dense.csv
 
+Output columns (units):
+  - timestamp (UTC ISO), t_s (seconds)
+  - ambient_C, it_kw
+  - supply_C, return_C, deltaT_C
+  - valve_pct, flow_LPM, pressure_kPa
+  - inlet_C, fan_pct, airflow_CFM, rh_pct
+  - pue_proxy (illustrative)
+
+Notes:
+  - Equations are intentionally simple. We want *plausible* numbers, not physics.
+  - A few anomalies are injected so downstream ML has something to detect.ß
+
 """
 
 import argparse
